@@ -1,0 +1,30 @@
+const currentCycle = 7;
+
+function sendSlackMessage (repeat=1) {
+  const url = "YOUR_URL_HERE"
+  const message = SpreadsheetApp.getActiveSpreadsheet().getRange(`'Cycle ${currentCycle}'!X3`).getValue()
+  const params = {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({
+      "text": `A page is ready to be checked. The current pages needed for checks are: ${message}.`      
+    })
+  }
+  const sendMsg = UrlFetchApp.fetch(url, params)
+  // var respCode = sendMsg.getResponseCode()
+  Logger.log(sendMsg)
+  // Logger.log(respCode)
+}
+
+function onEdit(event){
+
+  var changedCell = event.range
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  SpreadsheetApp.flush
+
+  const nextStep = SpreadsheetApp.getActiveSpreadsheet().getRange(`U${changedCell.getRow()}`)
+
+  Logger.log(changedCell.getColumn())
+
+  if(nextStep.getValue() == "[AdvisorName]") { 
+    sendSlackMessage()

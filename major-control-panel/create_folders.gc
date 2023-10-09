@@ -1,0 +1,167 @@
+var year = Number(SpreadsheetApp.getActiveSpreadsheet().getRange("B2").getValue())
+var yearFolder = DriveApp.getFolderById("1AI_k5x8krjO4diQuxMt9ZzA8ELgUOxb8")
+var numberWriters = Number(SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!B53").getValue())
+var ui = SpreadsheetApp.getUi();
+var thisSpreadsheet = SpreadsheetApp.getActiveSpreadsheet()
+var thisSheet = SpreadsheetApp.getActiveSheet()
+
+
+function startYear() {
+
+  let generalConfirm = ui.alert("General Confirmation (1/2)", 
+  `Are you sure that the details are correct?
+  School year: ${year}-${year+1}
+  Students: ${numberWriters}
+  `, 
+  ui.ButtonSet.YES_NO
+  );
+
+  if (generalConfirm != ui.Button.YES) return;
+
+  let allWriters = SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!B2:D52").getValues();
+  let allWriterString = ""
+  for (writerInfo of allWriters) {
+    if (writerInfo[0] == '') continue;
+    allWriterString += `${writerInfo[0]}\n`
+  }
+
+
+  // for (writer of allWriters) {
+
+  // }
+
+  let writerConfirm = ui.alert("Writers Confirmation (2/2)", 
+  `Are you sure that these are all the writers?
+
+  ${allWriterString}
+  `, 
+  ui.ButtonSet.YES_NO
+  );
+
+  if (writerConfirm != ui.Button.YES) return;
+
+
+
+
+  let templates = Number(SpreadsheetApp.getActiveSpreadsheet().getRange("Settings!B1").getValue())
+  let templateTemplates = Number(SpreadsheetApp.getActiveSpreadsheet().getRange("Settings!E1").getValue())
+
+  let templateArray = SpreadsheetApp.getActiveSpreadsheet().getRange(`Settings!B2:B${templates+1}`).getValues()
+  let templateTemplateArray = SpreadsheetApp.getActiveSpreadsheet().getRange(`Settings!E2:E${templateTemplates+1}`).getValues()
+
+
+  // Define variables for links of templates
+  let controlURL = templateArray[0][0]
+  let gradesURL = templateArray[1][0]
+  let storyAssignmentDatabaseURL = templateArray[2][0]
+  let storyAssignmentsURL = templateArray[3][0]
+  let storyAssignmentsStartingURL = templateArray[4][0]
+  let gradesTemplateURL = templateTemplateArray[0][0]
+  let sectionPreferencesTemplateURL = templateTemplateArray[1][0]
+  let seedSheetTemplateURL = templateTemplateArray[2][0]
+
+
+  // Logger.log(templateArray)
+  // Logger.log(templateTemplateArray)
+
+  // Create the year folder
+  let newYear = DriveApp.createFolder(year);
+
+  
+
+  // Create Templates folder
+  let newYearTemplates = DriveApp.createFolder(`${year} Templates`)
+
+  // Create Seeds Folder
+  let newYearSeeds = DriveApp.createFolder(`${year} Seed Sheets`)
+
+  // Templates: Will go into a folder
+  let newGradesTemplate = createGradeTemplate(gradesTemplateURL, newYearTemplates)
+
+  // Control & Grades: Won't go into a template folder
+  let newGrades = createGrades(gradesURL, newYear)
+  let newAssignments = createStoryAssignments(storyAssignmentsStartingURL, newYear)
+  let newControl = createControl(controlURL, newGrades.getUrl(), newGradesTemplate.getUrl(), "", newAssignments.getUrl(), newYearSeeds.getUrl(), newYear)
+  let newDatabase = createStoryAssignmentDatabase(storyAssignmentDatabaseURL,newAssignments.getUrl(), newControl.getUrl(), newGrades.getUrl(),newYear)
+  let newArchive = createStoryAssignmentsArchiveTemplate(storyAssignmentsURL, newControl.getUrl(), newDatabase.getUrl(), newYear)
+
+  // Template, but requires control archive link
+  let newPreferenceTemplate = createSectionPreferenceTemplate(sectionPreferencesTemplateURL, newControl.getUrl(), newArchive.getUrl(), newAssignments.getUrl(), newYearTemplates)
+
+  // Seed Sheets
+  let newSeedSheets = createSeedSheets(seedSheetTemplateURL, newControl.getUrl(), newDatabase.getUrl(), newGrades.getUrl(), newYearTemplates)
+
+
+  let templatesArray = [newGradesTemplate, newPreferenceTemplate]
+  let nonTemplatesArray = [newControl, newGrades, newDatabase, newArchive]
+
+
+  // Move the stuff into the folder
+  Logger.log(nonTemplatesArray)
+  Logger.log(templatesArray)
+
+  for (let file of nonTemplatesArray) {
+    file.moveTo(newYear)
+  }
+
+  for (let file of templatesArray) {
+    file.moveTo(newYearTemplates)
+  }
+
+  for (let seedSheet of newSeedSheets) {
+    seedSheet.moveTo(newYearSeeds)
+  }
+
+  newYear.moveTo(yearFolder)
+  newYearTemplates.moveTo(newYear)
+  newYearSeeds.moveTo(newYear)
+
+  // Set theeds and mannie as editors of the year folders
+  let numberTheeds = SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!N1").getValue()
+  let numberMannies = SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!S1").getValue()
+  let theeds = SpreadsheetApp.getActiveSpreadsheet().getRange(`'Writer/Section Panel'!N3:N${Number(2+numberTheeds)}`).getValues()
+  let mannies = SpreadsheetApp.getActiveSpreadsheet().getRange(`'Writer/Section Panel'!S3:S${Number(2+numberMannies)}`).getValues()
+
+  let theedEmails = getEmails(theeds)
+  let mannieEmails = getEmails(mannies)
+
+  newYear.addEditors(theedEmails)
+  newYear.addEditors(mannieEmails)
+
+  //Update the year in the spreadsheet
+  SpreadsheetApp.getActiveSpreadsheet().getRange("Information Panel!B2").setValue(year+1)
+}
+
+
+function getEmails(editorArray) {
+  let returnArray = []
+  for (let editor of editorArray) {
+    let name = editor[0]
+    Logger.log(name)
+    let textFinder = SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!B2:B52").createTextFinder(name)
+      .matchEntireCell(true)
+      .matchCase(true)
+      .matchFormulaText(false)
+      .findNext()
+      .offset(0, -1)
+      .getValue()
+    returnArray.push(textFinder)
+  }
+  return returnArray
+}
+
+
+function confirmAction(confirmationTitle, questionString) {
+  let confirm = ui.alert(confirmationTitle, 
+  questionString, 
+  ui.ButtonSet.YES_NO
+  );
+  if (confirm == ui.Button.YES) {
+  confirm = true;
+  } else if (confirm == ui.Button.NO) {
+  confirm = false;
+  };
+  return(confirm);
+}
+
+
