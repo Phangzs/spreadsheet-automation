@@ -7,7 +7,7 @@ var thisSheet = SpreadsheetApp.getActiveSheet()
 
 
 function startYear() {
-
+  // First confirm that everything is correct
   let generalConfirm = ui.alert("General Confirmation (1/2)", 
   `Are you sure that the details are correct?
   School year: ${year}-${year+1}
@@ -25,11 +25,6 @@ function startYear() {
     allWriterString += `${writerInfo[0]}\n`
   }
 
-
-  // for (writer of allWriters) {
-
-  // }
-
   let writerConfirm = ui.alert("Writers Confirmation (2/2)", 
   `Are you sure that these are all the writers?
 
@@ -46,6 +41,7 @@ function startYear() {
   let templates = Number(SpreadsheetApp.getActiveSpreadsheet().getRange("Settings!B1").getValue())
   let templateTemplates = Number(SpreadsheetApp.getActiveSpreadsheet().getRange("Settings!E1").getValue())
 
+  // Get templates arrays (to optimize read efficiency)
   let templateArray = SpreadsheetApp.getActiveSpreadsheet().getRange(`Settings!B2:B${templates+1}`).getValues()
   let templateTemplateArray = SpreadsheetApp.getActiveSpreadsheet().getRange(`Settings!E2:E${templateTemplates+1}`).getValues()
 
@@ -60,15 +56,9 @@ function startYear() {
   let sectionPreferencesTemplateURL = templateTemplateArray[1][0]
   let seedSheetTemplateURL = templateTemplateArray[2][0]
 
-
-  // Logger.log(templateArray)
-  // Logger.log(templateTemplateArray)
-
   // Create the year folder
   let newYear = DriveApp.createFolder(year);
-
   
-
   // Create Templates folder
   let newYearTemplates = DriveApp.createFolder(`${year} Templates`)
 
@@ -92,6 +82,7 @@ function startYear() {
   let newSeedSheets = createSeedSheets(seedSheetTemplateURL, newControl.getUrl(), newDatabase.getUrl(), newGrades.getUrl(), newYearTemplates)
 
 
+  // Prepare templates of templates for Control Panel sheet
   let templatesArray = [newGradesTemplate, newPreferenceTemplate]
   let nonTemplatesArray = [newControl, newGrades, newDatabase, newArchive]
 
@@ -112,6 +103,7 @@ function startYear() {
     seedSheet.moveTo(newYearSeeds)
   }
 
+  // File management
   newYear.moveTo(yearFolder)
   newYearTemplates.moveTo(newYear)
   newYearSeeds.moveTo(newYear)
@@ -122,13 +114,14 @@ function startYear() {
   let theeds = SpreadsheetApp.getActiveSpreadsheet().getRange(`'Writer/Section Panel'!N3:N${Number(2+numberTheeds)}`).getValues()
   let mannies = SpreadsheetApp.getActiveSpreadsheet().getRange(`'Writer/Section Panel'!S3:S${Number(2+numberMannies)}`).getValues()
 
+  // Make sure folder and files are shared with Theeds
   let theedEmails = getEmails(theeds)
   let mannieEmails = getEmails(mannies)
 
   newYear.addEditors(theedEmails)
   newYear.addEditors(mannieEmails)
 
-  //Update the year in the spreadsheet
+  // Update the year in the spreadsheet
   SpreadsheetApp.getActiveSpreadsheet().getRange("Information Panel!B2").setValue(year+1)
 }
 
@@ -137,7 +130,6 @@ function getEmails(editorArray) {
   let returnArray = []
   for (let editor of editorArray) {
     let name = editor[0]
-    Logger.log(name)
     let textFinder = SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!B2:B52").createTextFinder(name)
       .matchEntireCell(true)
       .matchCase(true)
