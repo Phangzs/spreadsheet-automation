@@ -1,0 +1,233 @@
+// Helper function to copy a file by link.
+
+function copyByLink(link, name, destination) {
+  let file = DriveApp.getFileById(SpreadsheetApp.openByUrl(link).getId())
+  let newFile = file.makeCopy(name, destination)
+  return(SpreadsheetApp.openById(newFile.getId()));
+}
+
+// "Gets" the drive sheet(s) based on the inputted sheet
+function getDriveSheet(sheet) {
+  if (Array.isArray(sheet) == false) {return(DriveApp.getFileById(sheet.getId()))}
+  
+  array = []
+  for (item of sheet) {
+    array.push(DriveApp.getFileById(item.getId()))
+  }
+  return array
+}
+
+
+// Yearly Spreadsheets
+function createControl(templateLink, gradesLink, gradesTemplateLink, preferenceTemplateLink, assignmentsLink, seedFolderLink, destination) {
+  let controlSheet = copyByLink(templateLink, `Control ${year}`, destination)
+  let writerSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Writer/Section Panel").copyTo(controlSheet)
+  let templates = [[gradesTemplateLink], [preferenceTemplateLink]]
+  let links = [[gradesLink], [assignmentsLink]]
+
+  // Set sheet to Writer/Section panel, rename that sheet (current sheet name is template-based)
+  SpreadsheetApp.setActiveSpreadsheet(controlSheet)
+  SpreadsheetApp.setActiveSheet(writerSheet)
+  controlSheet.moveActiveSheet(2);
+  SpreadsheetApp.getActiveSheet().setName("Writer/Section Panel")
+
+  // Paste in settings template
+  controlSheet.getRange("Settings!B3:B4").setValues(links);
+  controlSheet.getRange("Settings!D2:D3").setValues(templates)
+  controlSheet.getRange("Settings!B6").setValue(destination.getUrl())
+  controlSheet.getRange("Settings!B8").setValue(seedFolderLink)
+
+  // Maybe could replace with flush?
+  let writersFormula = controlSheet.getRange("Settings!B5").getFormula()
+  controlSheet.getRange("Settings!B5").setFormula(writersFormula)
+
+  // Sets permissions of sheet
+  let controlSpreadsheet = getDriveSheet(controlSheet)
+  controlSpreadsheet.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)
+
+  // Sets active spreadsheet back to this (original) sheet
+  SpreadsheetApp.setActiveSpreadsheet(thisSpreadsheet)
+  SpreadsheetApp.setActiveSheet(thisSheet)
+  
+  return(controlSpreadsheet);
+}
+
+// Creates Grades spreadsheet
+function createGrades(templateLink, destination) {
+  let gradesSheet = copyByLink(templateLink, `Grades ${year}`, destination);
+  return(getDriveSheet(gradesSheet));
+}
+
+// Creates story assignment database spreadsheet for use during algorithm-based assignments
+function createStoryAssignmentDatabase(templateLink, assignmentLink, controlLink, gradesLink, destination) {
+  // Create a copy of the template
+  let storyAssignmentDatabase = copyByLink(templateLink, `Story Assignment Database ${year}`, destination);
+  // Set settings
+  storyAssignmentDatabase.getRange("Settings!B2").setValue(assignmentLink)
+  let control = SpreadsheetApp.openByUrl(controlLink)
+  control.getRange("Settings!B7").setValue(storyAssignmentDatabase.getUrl())
+  let grades = SpreadsheetApp.openByUrl(gradesLink)
+  grades.getRange("Settings!J11").setValue(storyAssignmentDatabase.getUrl())
+  // Set permissions
+  let storyAssignmentDatabaseSpreadsheet = getDriveSheet(storyAssignmentDatabase)
+  storyAssignmentDatabaseSpreadsheet.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)
+  return(storyAssignmentDatabaseSpreadsheet);
+}
+
+// Create story assignments archive template
+function createStoryAssignmentsArchiveTemplate(templateLink, controlLink, assignmentsLink, destination) {
+  let storyAssignmentsArchiveTemplate = copyByLink(templateLink, `Story Assignment Archive ${year}`, destination);
+  // Optimized settings paste
+  let settingsArray = [[controlLink], [assignmentsLink]]
+  storyAssignmentsArchiveTemplate.getRange("Settings!B2:B3").setValues(settingsArray);
+  return(getDriveSheet(storyAssignmentsArchiveTemplate));
+}
+
+// Create story assignments spreadsheet
+function createStoryAssignments(templateLink, destination) {
+  let storyAssignmentsTemplate = copyByLink(templateLink, `Story Assignments ${year}`, destination);
+  let storyAssignmentsSpreadsheet = getDriveSheet(storyAssignmentsTemplate)
+  storyAssignmentsSpreadsheet.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)
+  return(storyAssignmentsSpreadsheet);
+}
+
+
+// Periodic Spreadsheets
+
+// Create section preference template
+function createSectionPreferenceTemplate(templateLink, controlURL, storyAssignmentArchiveURL, storyAssignmentsURL, destination) {
+  let sectionPreferenceTemplate = copyByLink(templateLink, `Section Preference Responses Template ${year}`, destination)
+  sectionPreferenceTemplate.getRange("Settings!B2").setValue(controlURL)
+  sectionPreferenceTemplate.getRange("Settings!B6").setValue(storyAssignmentArchiveURL)
+  sectionPreferenceTemplate.getRange("Settings!B7").setValue(storyAssignmentsURL)
+  let control = SpreadsheetApp.openByUrl(controlURL);
+  control.getRange("Settings!D3").setValue(sectionPreferenceTemplate.getUrl())
+  return(getDriveSheet(sectionPreferenceTemplate));
+}
+
+function createGradeTemplate(templateLink, destination) {
+  let gradesTemplate = copyByLink(templateLink, `Grades Template ${year}`, destination)
+  return(getDriveSheet(gradesTemplate));
+}
+
+// Seed sheets are not periodic
+
+function createSeedSheets(templateLink, controlLink, databaseLink, gradesLink, destination) {
+  let seedSheetTemplate = copyByLink(templateLink, `Seed Sheet Template ${year}`, destination)
+  let linkArray = [[gradesLink], [controlLink], [databaseLink]]
+  seedSheetTemplate.getRange("Settings!B2:B4").setValues(linkArray)
+  SpreadsheetApp.flush()
+
+  // Duplicate for seeds
+  const sectionNames = ["News & Opinion", "Lifestyle", "Sports", "Science & Technology"]
+  const sectionDict = {}
+  for (section of sectionNames) {
+    sectionDict[section] = {}
+  }
+
+  // Get seed names
+  let seeds = SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!O1:R1").getValues()[0]
+  let seedSheets = []
+  let seedSheetsURL = []
+  for (let seed in seeds) {
+    let seedNumber = seeds[seed]
+    let searchKey = String
+    let sheetName = String
+    seed = Number(seed)
+
+    // Get the specific seed. If it's the first seed then create a searchKeyRange to find the first seed.
+    if (seedNumber == 0) {
+      
+      let searchKeyRange = SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!F2:F100").createTextFinder(SpreadsheetApp.getActiveSpreadsheet().getRange(`'Writer/Section Panel'!${String.fromCharCode(Number("O".charCodeAt(0))+seed)}2`).getValue())
+        .matchEntireCell(true)
+        .matchCase(true)
+        .matchFormulaText(false)
+        .findNext()
+
+      sheetName = searchKeyRange.getValue().replace("Seed", "")
+
+      searchKey = searchKeyRange
+        .offset(0, 1)
+        .getValue()
+      
+      
+    } else {
+      Logger.log(Number("O".charCodeAt(0)))
+      Logger.log(seed)
+      Logger.log(Number("O".charCodeAt(0))+seed)
+      Logger.log(String.fromCharCode(Number("P".charCodeAt(0))+seed))
+
+      searchKey = SpreadsheetApp.getActiveSpreadsheet().getRange(`'Writer/Section Panel'!${String.fromCharCode(Number("O".charCodeAt(0))+seed)}2`).getValue()
+      sheetName = searchKey.replace("Seed", "")
+    }
+
+
+    // Copy seed sheet template
+    let seedSheet = copyByLink(seedSheetTemplate.getUrl(), `${sheetName}${year}`, destination)
+    seedSheet.getRange("Settings!B1").setValue(sheetName)
+
+    // Get column
+    let column = SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!O2:AM2").createTextFinder(searchKey)
+      .matchEntireCell(true)
+      .matchCase(true)
+      .matchFormulaText(false)
+      .findNext()
+      .getA1Notation()[0]
+
+    let numberEditors = SpreadsheetApp.getActiveSpreadsheet().getRange(`'Writer/Section Panel'!${column}1`).getValue()
+
+    let seedArray = SpreadsheetApp.getActiveSpreadsheet().getRange(`'Writer/Section Panel'!${column}3:${column}${Number(2+numberEditors)}`).getValues()
+    let editorEmails = []
+    Logger.log(seedArray)
+    for (let editor of seedArray) {
+      let editorName = editor[0]
+      let editorEmail = SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!B2:B52").createTextFinder(editorName)
+        .matchEntireCell(true)
+        .matchCase(true)
+        .matchFormulaText(false)
+        .findNext()
+        .offset(0, -1)
+        .getValue()
+      editorEmails.push(editorEmail)
+    }
+
+    // Share with editor emails for seed sheets
+    if (editorEmails.length == 1) {seedSheet.addEditor(editorEmails[0])} else {seedSheet.addEditors(editorEmails)}
+    seedSheets.push(seedSheet)
+    seedSheetsURL.push([seedSheet.getUrl()])
+  }
+
+  let editors = SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!N1:O1").getValues()[0]
+  let theeds = SpreadsheetApp.getActiveSpreadsheet().getRange(`'Writer/Section Panel'!N3:N${Number(2+editors[0])}`).getValues()
+
+  let spotlightSheet = copyByLink(seedSheetTemplate.getUrl(), `Spotlight ${year}`, destination)
+  spotlightSheet.getRange("Settings!B1").setValue("Spotlight")
+
+  // Same process as seed sheets but spotlight is shared with theeds
+  let theedArray = []
+  for (let theed of theeds) {
+    let theedName = theed[0]
+    let theedEmail = SpreadsheetApp.getActiveSpreadsheet().getRange("'Writer/Section Panel'!B2:B52").createTextFinder(theedName)
+        .matchEntireCell(true)
+        .matchCase(true)
+        .matchFormulaText(false)
+        .findNext()
+        .offset(0, -1)
+        .getValue()
+    theedArray.push(theedEmail)
+  }
+  spotlightSheet.addEditors(theedArray)
+  seedSheets.push(spotlightSheet)
+  seedSheetsURL.push([spotlightSheet.getUrl()])
+
+  let grades = SpreadsheetApp.openByUrl(gradesLink).getRange("Settings!J3:J7").setValues(seedSheetsURL)
+
+  DriveApp.getFileById(seedSheetTemplate.getId()).setTrashed(true)
+
+  return getDriveSheet(seedSheets)
+}
+
+function getArrays() {
+  let templateArray = SpreadsheetApp.getActiveSpreadsheet().getRange(`Settings!B2:B${templates+1}`).getValues()
+  let templateTemplateArray = SpreadsheetApp.getActiveSpreadsheet().getRange(`Settings!E2:E${templateTemplates+1}`).getValues()
+}
