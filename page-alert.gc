@@ -1,7 +1,9 @@
 const currentCycle = 7;
 
+// Function to send Slack message
 function sendSlackMessage (repeat=1) {
-  const url = "YOUR_URL_HERE"
+  const url = "SLACK_WEBHOOK_HERE"
+  // Gets page numbers from cells. X3 is a spreadsheet formula concatenating all page numbers ready to be checked
   const message = SpreadsheetApp.getActiveSpreadsheet().getRange(`'Cycle ${currentCycle}'!X3`).getValue()
   const params = {
     method: "post",
@@ -11,20 +13,20 @@ function sendSlackMessage (repeat=1) {
     })
   }
   const sendMsg = UrlFetchApp.fetch(url, params)
-  // var respCode = sendMsg.getResponseCode()
-  Logger.log(sendMsg)
-  // Logger.log(respCode)
 }
 
+// Detect if edit makes change to pages ready for page check
 function onEdit(event){
-
+  // Get range, flush all pending changes
   var changedCell = event.range
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   SpreadsheetApp.flush
 
+  // Get name of "Next Step"
   const nextStep = SpreadsheetApp.getActiveSpreadsheet().getRange(`U${changedCell.getRow()}`)
 
-  Logger.log(changedCell.getColumn())
-
+  // Send slack message if next step is advisor check
   if(nextStep.getValue() == "[AdvisorName]") { 
     sendSlackMessage()
+  }
+}
